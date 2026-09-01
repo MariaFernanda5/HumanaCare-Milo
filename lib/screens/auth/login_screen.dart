@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../services/firebase_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/app_state.dart';
 import '../../widgets/shared.dart';
@@ -13,26 +14,44 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 'gustavo@exemplo.com');
-  final _senhaCtrl = TextEditingController(text: '123456');
+  final _emailCtrl = TextEditingController();
+  final _senhaCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
   String? _erro;
 
   Future<void> _entrar() async {
-    if (_emailCtrl.text.isEmpty || _senhaCtrl.text.isEmpty) {
-      setState(() => _erro = 'Preencha email e senha.');
+    final email = _emailCtrl.text.trim();
+    final senha = _senhaCtrl.text.trim();
+
+    if (email.isEmpty || senha.isEmpty) {
+      setState(() => _erro = 'Email ou senha inválidos');
       return;
     }
-    setState(() { _loading = true; _erro = null; });
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
 
-    // Marca como logado no state (refreshListenable dispara o redirect)
-    context.read<AppState>().login('paciente');
-    setState(() => _loading = false);
-    context.go('/paciente');
+    setState(() {
+      _loading = true;
+      _erro = null;
+    });
 
+    try {
+      await FirebaseService.loginWithEmailAndPassword(
+        email: email,
+        senha: senha,
+      );
+
+      if (!mounted) return;
+
+      context.read<AppState>().login('paciente');
+      context.go('/paciente');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _erro = 'Email ou senha inválidos');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -105,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const Divider(height: 32, color: AppTheme.divider),
 
-              HCOutlineButton(label: 'Cria conta', onTap: () => context.go('/register')),
+              HCOutlineButton(label: 'Cria conta', onTap: () => GoRouter.of(context).go('/register')),
               const SizedBox(height: 16),
 
               TextButton(

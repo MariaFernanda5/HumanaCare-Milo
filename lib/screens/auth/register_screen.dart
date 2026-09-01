@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../services/firebase_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/app_state.dart';
 import '../../widgets/shared.dart';
@@ -18,16 +19,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _senhaCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  String? _erro;
 
   Future<void> _criar() async {
-    if (_nomeCtrl.text.isEmpty || _emailCtrl.text.isEmpty || _senhaCtrl.text.isEmpty) return;
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-    // Só após a escolha do tipo de usuário definimos o perfil no PerfilScreen.
-    setState(() => _loading = false);
-    context.go('/perfil');
+    final nome = _nomeCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final senha = _senhaCtrl.text.trim();
 
+    if (nome.isEmpty || email.isEmpty || senha.isEmpty) {
+      setState(() => _erro = 'Preencha todos os campos.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _erro = null;
+    });
+
+    try {
+      await FirebaseService.cadastrarUsuario(
+        nome: nome,
+        email: email,
+        senha: senha,
+      );
+
+      if (!mounted) return;
+
+      context.read<AppState>().login('paciente');
+      context.go('/perfil');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _erro = 'Email ou senha inválidos');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -74,6 +101,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: () => setState(() => _obscure = !_obscure),
                 ),
               ),
+
+              if (_erro != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _erro!,
+                  style: GoogleFonts.poppins(color: AppTheme.error, fontSize: 13),
+                ),
+              ],
 
               const SizedBox(height: 28),
               HCButton(label: 'Criar conta', onTap: _criar, loading: _loading),
